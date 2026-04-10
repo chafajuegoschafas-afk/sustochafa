@@ -230,6 +230,7 @@
         <div id="threshold"></div>
       </div>
       <div id="stats">
+        <span>Sensibilidad: <input id="sensSlider" type="range" min="1" max="4" step="0.1" value="2.2"></span>
         <span>Volumen: <b id="volText">0</b></span>
         <span>Tiempo: <b id="timeText">0</b>s</span>
         <span>Modo: <b id="modeText">Esperando</b></span>
@@ -280,8 +281,9 @@
     const screamers = ['susto1.mp4', 'susto2.mp4', 'susto3.mp4'];
 
     const config = {
-      noiseThreshold: 16,
-      talkThreshold: 8,
+      noiseThreshold: 10, // más sensible (antes 16)
+      talkThreshold: 5,  // más fácil detectar voz
+      sensitivityBoost: 2.2, // NUEVO: multiplica la señal del micrófono
       minSilent: 2200,
       maxSilent: 5200,
       minTalk: 750,
@@ -321,7 +323,8 @@
         sum += v * v;
       }
       const rms = Math.sqrt(sum / data.length);
-      return Math.min(100, Math.floor(rms * 120));
+      let boosted = rms * 120 * config.sensitivityBoost;
+      return Math.min(100, Math.floor(boosted));
     }
 
     function updateMic() {
@@ -445,6 +448,10 @@
         console.error(e);
       }
     }
+
+    document.getElementById('sensSlider').addEventListener('input', (e)=>{
+      config.sensitivityBoost = parseFloat(e.target.value);
+    });
 
     startBtn.addEventListener('click', startGame);
   </script>
