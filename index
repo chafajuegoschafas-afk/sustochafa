@@ -1,1 +1,452 @@
-chafa
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>No Hagas Ruido</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #fff;
+    }
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #000;
+    }
+    video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .vignette {
+      background: radial-gradient(circle, transparent 28%, rgba(0,0,0,0.82) 100%);
+    }
+    .scanline {
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.02) 0px,
+        rgba(255,255,255,0.02) 1px,
+        transparent 2px,
+        transparent 4px
+      );
+      opacity: 0.18;
+    }
+    #hud {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      z-index: 20;
+      width: min(430px, calc(100vw - 36px));
+      background: rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 16px;
+      padding: 16px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    }
+    #hud h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      letter-spacing: 1px;
+      color: #ffd9d9;
+      text-shadow: 0 0 16px rgba(255,80,80,0.35);
+    }
+    #hud p, #hud div {
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    #meterWrap {
+      position: relative;
+      width: 100%;
+      height: 20px;
+      margin-top: 10px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.14);
+    }
+    #meter {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #57ff84 0%, #ffd04d 60%, #ff4040 100%);
+      transition: width: 0.06s linear;
+    }
+    #threshold {
+      position: absolute;
+      top: 0;
+      width: 2px;
+      height: 100%;
+      left: 72%;
+      background: rgba(255,255,255,0.8);
+      box-shadow: 0 0 8px rgba(255,255,255,0.45);
+    }
+    #center {
+      position: absolute;
+      inset: 0;
+      z-index: 25;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      text-align: center;
+    }
+    #panel {
+      max-width: 760px;
+      background: rgba(0,0,0,0.62);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 18px;
+      padding: 24px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+    }
+    #panel h2 {
+      margin: 0 0 10px;
+      font-size: clamp(28px, 5vw, 52px);
+      letter-spacing: 1px;
+    }
+    #panel p {
+      margin: 10px 0;
+      font-size: clamp(15px, 2.2vw, 18px);
+      line-height: 1.6;
+      opacity: 0.92;
+    }
+    button {
+      margin-top: 16px;
+      padding: 14px 24px;
+      border: 0;
+      border-radius: 999px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(180deg, #fff, #dadada);
+      color: #111;
+      box-shadow: 0 10px 26px rgba(0,0,0,0.35);
+    }
+    #stateText {
+      position: absolute;
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%);
+      z-index: 22;
+      font-size: clamp(24px, 3vw, 38px);
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-align: center;
+      text-shadow: 0 0 16px rgba(0,0,0,0.8);
+      transition: opacity .15s ease, transform .15s ease;
+    }
+    .danger { color: #ff5d5d; }
+    .safe { color: #b6d8ff; }
+    .talk { color: #ffe28b; }
+    #subText {
+      position: absolute;
+      left: 50%;
+      bottom: 8px;
+      transform: translateX(-50%);
+      z-index: 22;
+      font-size: 15px;
+      opacity: .9;
+      text-align: center;
+    }
+    #flash {
+      position: absolute;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      z-index: 50;
+      pointer-events: none;
+    }
+    .shake {
+      animation: shake .18s linear infinite;
+    }
+    @keyframes shake {
+      0% { transform: translate(1px, 0); }
+      25% { transform: translate(-2px, 1px); }
+      50% { transform: translate(2px, -1px); }
+      75% { transform: translate(-1px, -2px); }
+      100% { transform: translate(1px, 2px); }
+    }
+    #stats {
+      margin-top: 10px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      opacity: 0.92;
+    }
+    #stats span {
+      background: rgba(255,255,255,0.06);
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    #help {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      z-index: 20;
+      font-size: 13px;
+      opacity: 0.9;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.12);
+      padding: 10px 12px;
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <video id="travelVideo" playsinline muted loop preload="auto">
+      <source src="viaje_loop.mp4" type="video/mp4">
+    </video>
+
+    <video id="screamerVideo" playsinline preload="auto" style="display:none"></video>
+
+    <div class="overlay vignette"></div>
+    <div class="overlay scanline"></div>
+    <div id="flash"></div>
+
+    <div id="hud">
+      <h1>NO HAGAS RUIDO</h1>
+      <div>Viajas por un túnel mientras una criatura acecha arriba. A veces debes guardar silencio. A veces debes hacer ruido rápido cuando te lo ordene.</div>
+      <div id="meterWrap">
+        <div id="meter"></div>
+        <div id="threshold"></div>
+      </div>
+      <div id="stats">
+        <span>Volumen: <b id="volText">0</b></span>
+        <span>Tiempo: <b id="timeText">0</b>s</span>
+        <span>Modo: <b id="modeText">Esperando</b></span>
+      </div>
+    </div>
+
+    <div id="stateText" class="safe">PREPÁRATE</div>
+    <div id="subText">Necesitas activar el micrófono para empezar.</div>
+
+    <div id="center">
+      <div id="panel">
+        <h2>NO HAGAS RUIDO</h2>
+        <p>La cosa que va sobre el túnel reacciona al sonido.</p>
+        <p><b>Modo silencio:</b> si haces ruido, pierdes.</p>
+        <p><b>Modo habla:</b> cuando el juego te avise, debes hablar o hacer un sonido rápido. Si no lo haces a tiempo, también pierdes.</p>
+        <p>Así nunca sabes si te conviene callarte o responder rápido.</p>
+        <button id="startBtn">Activar micrófono y jugar</button>
+      </div>
+    </div>
+
+    <div id="help">Pon en esta carpeta: <b>viaje_loop.mp4</b>, <b>susto1.mp4</b>, <b>susto2.mp4</b>, <b>susto3.mp4</b></div>
+  </div>
+
+  <script>
+    const travelVideo = document.getElementById('travelVideo');
+    const screamerVideo = document.getElementById('screamerVideo');
+    const meter = document.getElementById('meter');
+    const volText = document.getElementById('volText');
+    const timeText = document.getElementById('timeText');
+    const modeText = document.getElementById('modeText');
+    const stateText = document.getElementById('stateText');
+    const subText = document.getElementById('subText');
+    const startBtn = document.getElementById('startBtn');
+    const center = document.getElementById('center');
+    const flash = document.getElementById('flash');
+    const game = document.getElementById('game');
+
+    let audioContext, analyser, micSource, stream;
+    let currentVolume = 0;
+    let elapsed = 0;
+    let gameOver = false;
+    let rafId = null;
+    let timerInterval = null;
+    let stateTimer = null;
+    let talkDeadline = null;
+    let warnTimer = null;
+
+    const screamers = ['susto1.mp4', 'susto2.mp4', 'susto3.mp4'];
+
+    const config = {
+      noiseThreshold: 16,
+      talkThreshold: 8,
+      minSilent: 2200,
+      maxSilent: 5200,
+      minTalk: 750,
+      maxTalk: 1600,
+      warningBeforeTalk: 450,
+      trapChance: 0.35
+    };
+
+    let state = 'idle';
+
+    function rand(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function setState(text, css, sub='') {
+      stateText.textContent = text;
+      stateText.className = css;
+      if (sub) subText.textContent = sub;
+    }
+
+    async function initMic() {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 1024;
+      micSource = audioContext.createMediaStreamSource(stream);
+      micSource.connect(analyser);
+    }
+
+    function getMicLevel() {
+      if (!analyser) return 0;
+      const data = new Uint8Array(analyser.fftSize);
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) {
+        const v = (data[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / data.length);
+      return Math.min(100, Math.floor(rms * 120));
+    }
+
+    function updateMic() {
+      if (gameOver) return;
+      currentVolume = getMicLevel();
+      volText.textContent = currentVolume;
+      meter.style.width = Math.min(100, currentVolume) + '%';
+
+      if (state === 'silent' && currentVolume >= config.noiseThreshold) {
+        triggerScreamer('HICISTE RUIDO');
+        return;
+      }
+
+      if (state === 'talk' && currentVolume >= config.talkThreshold) {
+        clearTimeout(talkDeadline);
+        beginSilentPhase(true);
+        return;
+      }
+
+      rafId = requestAnimationFrame(updateMic);
+    }
+
+    function startClock() {
+      const start = Date.now();
+      timerInterval = setInterval(() => {
+        elapsed = Math.floor((Date.now() - start) / 1000);
+        timeText.textContent = elapsed;
+      }, 100);
+    }
+
+    function queueNextTrap() {
+      clearTimeout(stateTimer);
+      const wait = rand(config.minSilent, config.maxSilent);
+      stateTimer = setTimeout(() => {
+        if (Math.random() < config.trapChance) {
+          beginWarning();
+        } else {
+          queueNextTrap();
+        }
+      }, wait);
+    }
+
+    function beginSilentPhase(fromTalk = false) {
+      if (gameOver) return;
+      state = 'silent';
+      modeText.textContent = 'Silencio';
+      setState('GUARDA SILENCIO', 'safe', fromTalk ? 'Bien. Te escuchó y se alejó... por ahora.' : 'No hables. No te muevas. Va sobre el túnel.');
+      queueNextTrap();
+    }
+
+    function beginWarning() {
+      if (gameOver) return;
+      state = 'warning';
+      modeText.textContent = 'Alerta';
+      setState('ALGO BAJA...', 'danger', 'Prepárate. En un instante tendrás que hacer ruido.');
+      clearTimeout(warnTimer);
+      warnTimer = setTimeout(beginTalkWindow, config.warningBeforeTalk);
+    }
+
+    function beginTalkWindow() {
+      if (gameOver) return;
+      state = 'talk';
+      modeText.textContent = 'Habla';
+      setState('¡HABLA AHORA!', 'talk', 'Di algo, sopla o haz cualquier ruido rápido. Si no respondes, pierdes.');
+      clearTimeout(talkDeadline);
+      talkDeadline = setTimeout(() => {
+        triggerScreamer('NO HABLASTE A TIEMPO');
+      }, rand(config.minTalk, config.maxTalk));
+    }
+
+    function flashScreen() {
+      flash.style.transition = 'none';
+      flash.style.opacity = '0.95';
+      requestAnimationFrame(() => {
+        flash.style.transition = 'opacity .35s ease';
+        flash.style.opacity = '0';
+      });
+    }
+
+    function triggerScreamer(reason) {
+      if (gameOver) return;
+      gameOver = true;
+      state = 'dead';
+      modeText.textContent = 'Fin';
+      setState('PERDISTE', 'danger', reason);
+      clearInterval(timerInterval);
+      clearTimeout(stateTimer);
+      clearTimeout(talkDeadline);
+      clearTimeout(warnTimer);
+      cancelAnimationFrame(rafId);
+      flashScreen();
+      game.classList.add('shake');
+      travelVideo.pause();
+      screamerVideo.style.display = 'block';
+      screamerVideo.src = screamers[Math.floor(Math.random() * screamers.length)];
+      screamerVideo.currentTime = 0;
+      screamerVideo.play().catch(() => {});
+
+      setTimeout(() => {
+        center.style.display = 'flex';
+        document.getElementById('panel').innerHTML = `
+          <h2>PERDISTE</h2>
+          <p><b>${reason}</b></p>
+          <p>Duraste ${elapsed} segundos.</p>
+          <p>En silencio no hagas ruido. Pero cuando te avise, tienes que hablar rápido.</p>
+          <button onclick="location.reload()">Jugar otra vez</button>
+        `;
+      }, 1300);
+    }
+
+    async function startGame() {
+      try {
+        await initMic();
+        center.style.display = 'none';
+        await travelVideo.play().catch(() => {});
+        startClock();
+        beginSilentPhase(false);
+        updateMic();
+      } catch (e) {
+        alert('Debes permitir acceso al micrófono para jugar.');
+        console.error(e);
+      }
+    }
+
+    startBtn.addEventListener('click', startGame);
+  </script>
+</body>
+</html>
