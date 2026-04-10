@@ -230,7 +230,7 @@
         <div id="threshold"></div>
       </div>
       <div id="stats">
-        <span>Sensibilidad: <input id="sensSlider" type="range" min="1" max="4" step="0.1" value="2.2"></span>
+        <span>Sensibilidad: <input id="sensSlider" type="range" min="1" max="8" step="0.1" value="3.5"></span>
         <span>Volumen: <b id="volText">0</b></span>
         <span>Tiempo: <b id="timeText">0</b>s</span>
         <span>Modo: <b id="modeText">Esperando</b></span>
@@ -281,13 +281,13 @@
     const screamers = ['susto1.mp4', 'susto2.mp4', 'susto3.mp4'];
 
     const config = {
-      noiseThreshold: 10, // más sensible (antes 16)
-      talkThreshold: 5,  // más fácil detectar voz
-      sensitivityBoost: 2.2, // NUEVO: multiplica la señal del micrófono
+      noiseThreshold: 10,
+      talkThreshold: 3,
+      sensitivityBoost: 3.5,
       minSilent: 2200,
       maxSilent: 5200,
-      minTalk: 750,
-      maxTalk: 1600,
+      minTalk: 1200,
+      maxTalk: 2200,
       warningBeforeTalk: 450,
       trapChance: 0.35
     };
@@ -317,13 +317,16 @@
       if (!analyser) return 0;
       const data = new Uint8Array(analyser.fftSize);
       analyser.getByteTimeDomainData(data);
+      let peak = 0;
       let sum = 0;
       for (let i = 0; i < data.length; i++) {
-        const v = (data[i] - 128) / 128;
+        const v = Math.abs((data[i] - 128) / 128);
+        if (v > peak) peak = v;
         sum += v * v;
       }
       const rms = Math.sqrt(sum / data.length);
-      let boosted = rms * 120 * config.sensitivityBoost;
+      const combined = (rms * 0.7) + (peak * 0.9);
+      let boosted = combined * 100 * config.sensitivityBoost;
       return Math.min(100, Math.floor(boosted));
     }
 
@@ -340,7 +343,10 @@
 
       if (state === 'talk' && currentVolume >= config.talkThreshold) {
         clearTimeout(talkDeadline);
-        beginSilentPhase(true);
+        setState('TE OYÓ...', 'talk', 'Respondiste a tiempo. Sigue avanzando.');
+        setTimeout(() => {
+          if (!gameOver) beginSilentPhase(true);
+        }, 180);
         return;
       }
 
